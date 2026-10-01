@@ -60,6 +60,7 @@ O pedido atravessa poucas fronteiras, e cada uma é explícita:
 | Chunking semântico e ingestão idempotente | Entregue | `src/retrieval/ingester.py` |
 | Busca híbrida, fusão, rerank e falha de ramo | Entregue | `src/retrieval/hybrid_search.py` |
 | Testes de chunking, fusão, ingestão e busca | Entregue | `tests/unit/` |
+| Demo local, sem chave de API e sem Docker | Entregue | `.venv/bin/python -m src.retrieval.demo` |
 | Corpus de políticas de exemplo | Entregue | `data/sample_docs/` |
 | Máquina de estados LangGraph e gate humano | Próximo | `src/agent/` |
 | Ferramentas MCP de suporte | Próximo | `src/tools/` |
@@ -179,7 +180,28 @@ enterprise-docops-ai/
 └── tests/unit/             # Testes de retrieval
 ```
 
-## Como executar
+## Rodar sem chave de API
+
+Esse caminho não chama OpenAI nem Cohere, e não precisa de Docker. O Qdrant roda embutido, em disco. O encoder denso é local, por hashing, então não há download de modelo. A frase impressa é copiada da política recuperada. Um modelo não escreve a resposta.
+
+No macOS o comando do sistema é `python3`. O `python` só passa a existir depois de ativar o ambiente virtual.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m src.retrieval.demo
+```
+
+Sem ativar o ambiente:
+
+```bash
+.venv/bin/python -m src.retrieval.demo "Em quantos dias o cliente pode solicitar estorno?"
+```
+
+As mesmas classes de ingestão e busca valem em produção. Lá, `EMBEDDING_PROVIDER=openai` ou `local` troca o encoder, `RERANKER_PROVIDER=cohere` troca o rerank lexical, e `QDRANT_PATH` fica vazio para falar com o servidor Qdrant.
+
+## Rodar contra o servidor Qdrant
 
 ```bash
 python -m venv .venv

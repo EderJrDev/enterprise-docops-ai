@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import math
+import re
+import unicodedata
 from typing import Protocol
 
 import httpx
@@ -22,6 +26,28 @@ logger = structlog.get_logger(__name__)
 
 _EMBED_BATCH_SIZE = 64
 _BM25_MODEL = "Qdrant/bm25"
+_TOKEN = re.compile(r"[a-z0-9]{3,}")
+_STOPWORDS = frozenset(
+    {
+        "apos",
+        "ate",
+        "com",
+        "das",
+        "dos",
+        "esta",
+        "este",
+        "nao",
+        "para",
+        "pela",
+        "pelo",
+        "por",
+        "que",
+        "sao",
+        "seu",
+        "sua",
+        "uma",
+    }
+)
 
 
 class EmbeddingProvider(Protocol):
@@ -38,6 +64,27 @@ class EmbeddingProvider(Protocol):
 
     async def aclose(self) -> None:
         """Libera conexões do provedor."""
+
+
+def tokenize(text: str) -> list[str]:
+    """Minúsculas, sem acento, sem stopwords curtas. A mesma função indexa e consulta."""
+    folded = unicodedata.normalize("NFKD", text.lower())
+    folded = "".join(char for char in folded if not unicodedata.combining(char))
+    return [token for token in _TOKEN.findall(folded) if token not in _STOPWORDS]
+
+
+def local_sparse_vector(text: str) -> rest.SparseVector:
+    """TF saturado. O modificador IDF da coleção completa o BM25 no Qdrant local."""
+    counts: dict[int, float] = {}
+    for token in tokenize(text):
+        digest = hashlib.blake2b(token.encode("utf-8"), digest_size=4).digest()
+        index = int.from_bytes(digest, "little")
+        counts[index] = counts.get(index, 0.0) + 1.0
+    if not counts:
+        counts[0] = 1.0
+    indices = sorted(counts)
+    values = [counts[index] * 2.2 / (counts[index] + 1.2) for index in indices]
+    return rest.SparseVector(indices=indices, values=values)
 
 
 def bm25_document(text: str) -> rest.Document:
@@ -199,8 +246,57 @@ class LocalEmbeddingProvider:
         return encoded.tolist()
 
 
+class HashingEmbeddingProvider:
+    """Encoder denso local, sem download e sem chave.
+
+    Cada token cai num balde de uma tabela fixa. Frases com o mesmo vocabulário
+    ficam próximas. Em produção o provedor troca para OpenAI ou ``BAAI/bge-m3``
+    sem mudar a ingestão nem a busca.
+    """
+
+    def __init__(self, dimensions: int = 384) -> None:
+        if dimensions < 32:
+            raise ValueError("O encoder local precisa de pelo menos 32 dimensões")
+        self._dimensions = dimensions
+
+    async def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [_hash_embed(text, self._dimensions) for text in texts]
+
+    async def embed_query(self, text: str) -> list[float]:
+        return _hash_embed(text, self._dimensions)
+
+    async def vector_size(self) -> int:
+        return self._dimensions
+
+    async def aclose(self) -> None:
+        return None
+
+
+def _hash_embed(text: str, dimensions: int) -> list[float]:
+    vector = [0.0] * dimensions
+    tokens = tokenize(text)
+    if not tokens:
+        vector[0] = 1.0
+        return vector
+    for token in tokens:
+        _accumulate(vector, token, 1.0)
+    for left, right in zip(tokens, tokens[1:], strict=False):
+        _accumulate(vector, f"{left}_{right}", 0.5)
+    norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+    return [value / norm for value in vector]
+
+
+def _accumulate(vector: list[float], key: str, weight: float) -> None:
+    digest = hashlib.blake2b(key.encode("utf-8"), digest_size=8).digest()
+    bucket = int.from_bytes(digest[:4], "little") % len(vector)
+    sign = 1.0 if digest[4] % 2 == 0 else -1.0
+    vector[bucket] += sign * weight
+
+
 def build_embedding_provider(settings: Settings) -> EmbeddingProvider:
     """Escolhe o provedor denso conforme ``EMBEDDING_PROVIDER``."""
+    if settings.embedding_provider == "hashing":
+        return HashingEmbeddingProvider(settings.embedding_dimensions)
     if settings.embedding_provider == "local":
         return LocalEmbeddingProvider(settings)
     return OpenAIEmbeddingProvider(settings)

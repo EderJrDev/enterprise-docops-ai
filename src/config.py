@@ -15,7 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 EnvironmentName = Literal["development", "staging", "production"]
 LogLevelName = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 LLMProviderName = Literal["openai", "anthropic", "ollama"]
-EmbeddingProviderName = Literal["openai", "local"]
+EmbeddingProviderName = Literal["openai", "local", "hashing"]
 RerankerProviderName = Literal["cohere", "local"]
 FusionStrategyName = Literal["rrf", "dbsf"]
 ChunkThresholdType = Literal["percentile", "standard_deviation", "interquartile"]
@@ -88,6 +88,7 @@ class Settings(BaseSettings):
 
     # --- Qdrant ---
     qdrant_url: str = "http://localhost:6333"
+    qdrant_path: str | None = None
     qdrant_grpc_port: int = Field(default=6334, ge=1, le=65535)
     qdrant_api_key: SecretStr | None = None
     qdrant_collection: str = "docops_documents"
@@ -152,7 +153,7 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in stripped.split(",") if origin.strip()]
         return value
 
-    @field_validator("openai_base_url", mode="before")
+    @field_validator("openai_base_url", "qdrant_path", mode="before")
     @classmethod
     def blank_url_to_none(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():

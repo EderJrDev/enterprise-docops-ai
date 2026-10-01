@@ -11,12 +11,8 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as rest
 
 from src.config import FusionStrategyName, Settings, get_settings
-from src.retrieval.embeddings import (
-    EmbeddingProvider,
-    bm25_document,
-    build_embedding_provider,
-)
-from src.retrieval.ingester import _build_qdrant_client, _qdrant_timeout
+from src.retrieval.embeddings import EmbeddingProvider, build_embedding_provider
+from src.retrieval.ingester import _build_qdrant_client, _qdrant_timeout, _sparse_representation
 
 logger = structlog.get_logger(__name__)
 
@@ -280,7 +276,7 @@ class HybridSearcher:
     ) -> list[RetrievedChunk]:
         response = await self._client.query_points(
             collection_name=self._settings.qdrant_collection,
-            query=bm25_document(query),
+            query=_sparse_representation(query, self._settings),
             using=self._settings.qdrant_sparse_vector_name,
             query_filter=query_filter,
             limit=limit,

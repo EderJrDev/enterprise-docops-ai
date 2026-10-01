@@ -23,6 +23,7 @@ from src.retrieval.embeddings import (
     EmbeddingProvider,
     bm25_document,
     build_embedding_provider,
+    local_sparse_vector,
 )
 
 logger = structlog.get_logger(__name__)
@@ -293,6 +294,8 @@ class DocumentIngester:
             )
             logger.info("qdrant_collection_created", collection=name, dimensions=size)
 
+        if self._settings.qdrant_path:
+            return
         try:
             await self._client.create_payload_index(
                 collection_name=name,
@@ -336,13 +339,11 @@ class DocumentIngester:
         for chunk, vector in zip(chunks, vectors, strict=True):
             point_id = chunk_point_id(chunk.source, chunk.index, chunk.text)
             point_ids.append(point_id)
+            sparse_vector = _sparse_representation(chunk.text, self._settings)
             points.append(
                 rest.PointStruct(
                     id=point_id,
-                    vector={
-                        dense_name: vector,
-                        sparse_name: bm25_document(chunk.text),
-                    },
+                    vector={dense_name: vector, sparse_name: sparse_vector},
                     payload=_payload(chunk),
                 )
             )
@@ -359,6 +360,8 @@ class DocumentIngester:
 
 
 def _build_qdrant_client(settings: Settings) -> AsyncQdrantClient:
+    if settings.qdrant_path:
+        return AsyncQdrantClient(path=settings.qdrant_path)
     return AsyncQdrantClient(
         url=settings.qdrant_url,
         api_key=settings.reveal(settings.qdrant_api_key),
@@ -366,6 +369,12 @@ def _build_qdrant_client(settings: Settings) -> AsyncQdrantClient:
         prefer_grpc=settings.qdrant_prefer_grpc,
         timeout=_qdrant_timeout(settings),
     )
+
+
+def _sparse_representation(text: str, settings: Settings) -> rest.Document | rest.SparseVector:
+    if settings.qdrant_path:
+        return local_sparse_vector(text)
+    return bm25_document(text)
 
 
 def _qdrant_timeout(settings: Settings) -> int:

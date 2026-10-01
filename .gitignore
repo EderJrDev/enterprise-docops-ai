@@ -19,6 +19,7 @@ build/
 
 qdrant_storage/
 data/qdrant_storage/
+data/qdrant_local/
 
 .DS_Store
 .idea/

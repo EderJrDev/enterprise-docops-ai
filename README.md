@@ -60,6 +60,7 @@ The request crosses a small number of explicit boundaries:
 | Semantic chunking and idempotent ingestion | Shipped | `src/retrieval/ingester.py` |
 | Hybrid search, fusion, rerank, branch failure | Shipped | `src/retrieval/hybrid_search.py` |
 | Unit tests for chunking, fusion, ingest, and search | Shipped | `tests/unit/` |
+| Local demo, no API keys and no Docker | Shipped | `.venv/bin/python -m src.retrieval.demo` |
 | Sample policy corpus | Shipped | `data/sample_docs/` |
 | LangGraph state machine and human gate | Next | `src/agent/` |
 | MCP tools for support operations | Next | `src/tools/` |
@@ -179,7 +180,28 @@ enterprise-docops-ai/
 └── tests/unit/             # Retrieval tests
 ```
 
-## Run it
+## Run it without API keys
+
+This path does not call OpenAI or Cohere, and it does not need Docker. Qdrant runs embedded on disk. The dense encoder is a local hashing encoder, so nothing is downloaded. The answer printed below is a sentence copied from the retrieved policy, not text written by a model.
+
+On macOS the system command is `python3`. After the virtualenv is active, `python` exists.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m src.retrieval.demo
+```
+
+Without activating the environment:
+
+```bash
+.venv/bin/python -m src.retrieval.demo "Em quantos dias o cliente pode solicitar estorno?"
+```
+
+The same ingestion and search classes are used in production. There, `EMBEDDING_PROVIDER=openai` or `local` replaces the hashing encoder, `RERANKER_PROVIDER=cohere` replaces the lexical rerank, and `QDRANT_PATH` stays empty so the client talks to the Qdrant server.
+
+## Run it against the Qdrant server
 
 ```bash
 python -m venv .venv
