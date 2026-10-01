@@ -1,0 +1,60 @@
+# Enterprise DocOps AI — dependências pinadas (PyPI, outubro/2026).
+# Runtime da API, retrieval, agente, observabilidade e avaliação.
+
+# --- API ---
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
+slowapi==0.1.10
+httpx==0.28.1
+anyio==4.15.1
+
+# --- Configuração e validação ---
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.4
+
+# --- Agente e orquestração ---
+langchain==1.4.3
+langchain-core==1.6.6
+langchain-text-splitters==1.1.2
+langchain-openai==1.6.7
+langchain-anthropic==1.7.5
+langchain-ollama==1.1.0
+langchain-qdrant==1.1.0
+langchain-community==0.4.2
+langchain-experimental==0.4.2
+langgraph==1.2.12
+
+# --- Retrieval ---
+qdrant-client==1.19.1
+rank-bm25==0.2.2
+# SDK direto. langchain-cohere 0.6 ainda exige cohere<6.
+cohere==7.2.0
+pypdf==6.19.0
+tiktoken==0.14.0
+numpy==2.5.3
+
+# Reranker local (fallback). Inclui PyTorch e aumenta a imagem Docker.
+sentence-transformers==6.1.0
+
+# --- Ferramentas MCP ---
+mcp==2.2.0
+fastmcp==4.0.10
+
+# --- Segurança ---
+spacy==3.8.16
+
+# --- Resiliência e logs ---
+tenacity==9.1.4
+structlog==26.1.0
+
+# --- Observabilidade e avaliação ---
+langfuse==4.16.0
+ragas==0.4.3
+datasets==5.0.1
+
+# --- Testes ---
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
